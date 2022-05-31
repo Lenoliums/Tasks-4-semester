@@ -1,12 +1,12 @@
 from itertools import cycle
-from socket import AI_NUMERICHOST
-from time import strptime
 import numpy as np
 import pandas as pd
-from datetime import datetime, date
-from dateutil.parser import parse
+from datetime import date
 import re
 import matplotlib.pyplot as plt
+
+
+
 MONTH_NAMES = {'Jan' : 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12}
 class badDate():
     def __init__(self, year = '????', month='??', day='??'):
@@ -42,9 +42,11 @@ def parseBadDate(x):
         return badDate()
 
 def getTagCounts(column: pd.Series):
-    tags = [inner for outer in column.values for inner in outer]
+    tags = list(set(sum(column.values.tolist(), [])))
+    column = column.map(lambda x: ", ".join(x))
+
     return pd.Series({
-        tag:  column[ column.map(set([tag]).issubset) ].count() for tag in sorted(tags)
+        tag:  column[ column.str.contains(tag) ].count() for tag in sorted(tags)
     }) #mappign each tag to its count and returning as Series
 
 infoOut = '''
@@ -89,11 +91,11 @@ def main(doTask=[], doGraph=[]):
     anime["airdate"] = anime["airdate"].map( lambda x: parseBadDate(x) )
     anime["theme"] = anime["theme"].map(lambda x: x.split(','))
     anime["genre"] = anime["genre"].map(lambda x: x.split(','))
-    # anime["source"] = anime["source"].map(lambda x: 'Diomedea' if 'é' in x else x.split(','))
+    # anime["source"] = anime["source"].map(lambda x: 'Diomedea' if 'Г©' in x else x.split(','))
     # anime["production"] = anime["production"].map(lambda x: x.split(','))
 
     pd.set_option('display.max_columns', None) 
-    
+
     # 2
     if 2 in doTask:
         out.write(anime.head(10).to_string())
@@ -138,8 +140,10 @@ def main(doTask=[], doGraph=[]):
         keysPN = prodToNum.keys()
         valsPN = prodToNum.values
         if(1 in doGraph):
-            plt.bar( range(len(keysPN)), valsPN, width=0.9 )
             plt.title('Number of releases by company')
+            plt.bar( range(len(keysPN)), valsPN, width=0.9 )
+            plt.xlabel("Company name")
+            plt.ylabel("Number of titles")
             plt.show()
         out.write(f'Most releases: "{keysPN[-1]}" with {valsPN[-1]} title\n')
         out.write(f'Least releases: "{keysPN[0]}" with {valsPN[0]} title\n')
@@ -154,6 +158,8 @@ def main(doTask=[], doGraph=[]):
             spaces = cycle(['', '|\n'])
             # plt.xticks(range(0, len(keysTE)), keysTE, rotation=45)
             plt.xticks(range(len(keysTE)), [f'{next(spaces)}{label}' for label in keysTE])
+            plt.xlabel("Number of episodes")
+            plt.ylabel("Number of titles")
             plt.title('Number of titles with same amount of episodes')
             plt.show()
         out.write(f'Most common number of episodes: {titleToEpisodes.idxmax().values[0]}\n')
@@ -208,8 +214,8 @@ def main(doTask=[], doGraph=[]):
         out.write(f'''Most popular anime companies: { ', '.join( ['"%s"' % comp for comp in keysRM[:3]] ) } \n''')
     
 
-    rIntervals = anime['rating'].groupby( pd.cut( anime["rating"], np.arange(0, 11, 1), right=False) ).count()
     if 10 in doTask:
+        rIntervals = anime['rating'].groupby( pd.cut( anime["rating"], np.arange(0, 11, 1), right=False) ).count()
         keysRI = rIntervals.index.to_list()
         valsRI = rIntervals.values.tolist()
         if(10 in doGraph):
@@ -219,7 +225,7 @@ def main(doTask=[], doGraph=[]):
             plt.xlim([-1, len(valsRI) +1])
             plt.show()
 
-        out.write(f'Most often ratings: { rIntervals.idxmax() } \n')
+        out.write(f'Most often ratings: { rIntervals.idxmax() } \n\n')
 
     if 11 in doTask:
         slice = anime[["rating", "genre", 'theme']].dropna(axis=0)
@@ -241,6 +247,7 @@ def main(doTask=[], doGraph=[]):
         df = pd.DataFrame(data, columns=themes, index=genres)
         out.write('\tMean rating value for each (genre, theme) pair\n')
         out.write(df.to_string())
+        
     if 12 in doTask:
         plt.plot(anime['voters'], anime['rating'])
         plt.title('Correlation: Voters/Rating')
@@ -249,8 +256,6 @@ def main(doTask=[], doGraph=[]):
 
         plt.show()
     out.close()
-    
-    
 
 if __name__ == '__main__':
     main(doTask=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], doGraph=[1, 2, 3, 4, 5, 9, 10])
